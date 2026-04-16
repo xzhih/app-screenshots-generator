@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Plus, Trash2, Download, Copy } from 'lucide-react';
-import { useSession } from '../store/session';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Trash2, Download, Copy, Pencil, ChevronDown, FileUp } from 'lucide-react';
+import { useSession, getCanvasSize } from '../store/session';
 import { PLATFORM_LIST, PLATFORMS, type Platform } from '../lib/platforms';
+import { importJSON } from '../lib/export';
 
 type Props = {
   onExport: (id: string) => void;
 };
+
+type Mode = 'closed' | 'menu' | 'platforms';
 
 export function Sidebar({ onExport }: Props) {
   const screenshots = useSession((s) => s.screenshots);
@@ -15,28 +18,82 @@ export function Sidebar({ onExport }: Props) {
   const remove = useSession((s) => s.removeScreenshot);
   const setActive = useSession((s) => s.setActive);
   const rename = useSession((s) => s.renameScreenshot);
-  const [adding, setAdding] = useState(false);
+  const importScreens = useSession((s) => s.importJSON);
+  const [mode, setMode] = useState<Mode>('closed');
+  const menuRef = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (mode !== 'menu') return;
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMode('closed');
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [mode]);
+
+  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const items = await importJSON(f);
+      importScreens(items);
+      setMode('closed');
+    } catch (err) {
+      alert(`Import failed: ${(err as Error).message}`);
+    }
+  }
 
   return (
     <aside className="w-64 shrink-0 bg-neutral-950 border-r border-neutral-800 flex flex-col">
       <div className="p-3 border-b border-neutral-800 flex items-center justify-between">
         <div className="text-sm font-medium">Screenshots</div>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white rounded px-2 py-1 text-xs"
-        >
-          <Plus size={12} /> New
-        </button>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() =>
+              setMode((m) => (m === 'closed' ? 'menu' : 'closed'))
+            }
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white rounded px-2 py-1 text-xs"
+          >
+            <Plus size={12} /> New <ChevronDown size={12} />
+          </button>
+          {mode === 'menu' && (
+            <div className="absolute right-0 mt-1 w-40 bg-neutral-900 border border-neutral-800 rounded shadow-lg z-10 py-1">
+              <button
+                onClick={() => setMode('platforms')}
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-neutral-800 flex items-center gap-2"
+              >
+                <Plus size={12} /> New screenshot
+              </button>
+              <button
+                onClick={() => importRef.current?.click()}
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-neutral-800 flex items-center gap-2"
+              >
+                <FileUp size={12} /> Import JSON
+              </button>
+            </div>
+          )}
+        </div>
+        <input
+          ref={importRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={onImport}
+        />
       </div>
 
-      {adding && (
+      {mode === 'platforms' && (
         <div className="p-2 border-b border-neutral-800 grid grid-cols-1 gap-1">
           {PLATFORM_LIST.map((p) => (
             <button
               key={p.id}
               onClick={() => {
                 add(p.id as Platform);
-                setAdding(false);
+                setMode('closed');
               }}
               className="text-left bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded px-2 py-1.5 text-xs flex items-center justify-between"
             >
@@ -56,8 +113,9 @@ export function Sidebar({ onExport }: Props) {
           </div>
         ) : (
           <ul className="p-2 space-y-1">
-            {screenshots.map((s, i) => {
+            {screenshots.map((s) => {
               const spec = PLATFORMS[s.platform];
+              const size = getCanvasSize(s);
               const isActive = s.id === activeId;
               return (
                 <li
@@ -71,16 +129,14 @@ export function Sidebar({ onExport }: Props) {
                 >
                   <div className="p-2">
                     <div className="flex items-center justify-between gap-2">
-                      <input
+                      <EditableName
                         value={s.name}
-                        onChange={(e) => rename(s.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 bg-transparent text-sm focus:outline-none"
+                        onCommit={(next) => rename(s.id, next)}
                       />
                       <span className="text-[10px] text-neutral-500 uppercase">{spec.label}</span>
                     </div>
                     <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                      {spec.width}×{spec.height}
+                      {size.width}×{size.height}
                     </div>
                     <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -126,5 +182,67 @@ export function Sidebar({ onExport }: Props) {
         {screenshots.length} screenshot{screenshots.length === 1 ? '' : 's'}
       </div>
     </aside>
+  );
+}
+
+function EditableName({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(value);
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
+    }
+  }, [editing, value]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== value) onCommit(next);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        className="flex-1 bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:border-blue-500"
+      />
+    );
+  }
+
+  return (
+    <div className="flex-1 flex items-center gap-1 min-w-0">
+      <span className="text-sm truncate">{value}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        title="Rename"
+        className="p-0.5 rounded hover:bg-neutral-800 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+      >
+        <Pencil size={11} />
+      </button>
+    </div>
   );
 }

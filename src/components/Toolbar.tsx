@@ -1,25 +1,10 @@
-import { useRef } from 'react';
-import { Undo2, Redo2, Download, FileJson, FileUp, Image as ImageIcon } from 'lucide-react';
+import { Undo2, Redo2, Download, FileJson, Image as ImageIcon } from 'lucide-react';
 import { useSession } from '../store/session';
-import { exportJSON, exportScreenshotPng, importJSON } from '../lib/export';
+import { exportJSON, exportScreenshotPng } from '../lib/export';
 
 export function Toolbar() {
-  const importRef = useRef<HTMLInputElement>(null);
   const screenshots = useSession((s) => s.screenshots);
   const active = useSession((s) => s.screenshots.find((x) => x.id === s.activeId) ?? null);
-  const importScreens = useSession((s) => s.importJSON);
-
-  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    e.target.value = '';
-    if (!f) return;
-    try {
-      const items = await importJSON(f);
-      importScreens(items);
-    } catch (err) {
-      alert(`Import failed: ${(err as Error).message}`);
-    }
-  }
 
   return (
     <div className="h-12 shrink-0 bg-neutral-950 border-b border-neutral-800 flex items-center px-3 gap-2">
@@ -40,10 +25,6 @@ export function Toolbar() {
       </Btn>
 
       <div className="ml-auto flex items-center gap-2">
-        <Btn onClick={() => importRef.current?.click()} title="Import JSON">
-          <FileUp size={14} />
-          <span>Import</span>
-        </Btn>
         <Btn
           onClick={() => exportJSON(screenshots)}
           disabled={screenshots.length === 0}
@@ -63,8 +44,6 @@ export function Toolbar() {
           <span>Export PNG</span>
         </Btn>
       </div>
-
-      <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={onImport} />
     </div>
   );
 }

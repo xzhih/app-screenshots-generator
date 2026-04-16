@@ -16,11 +16,8 @@ export function useKeyboardShortcuts() {
       if (meta && e.key.toLowerCase() === 'z') {
         if (editable) return;
         e.preventDefault();
-        if (e.shiftKey) {
-          useSession.temporal.getState().redo();
-        } else {
-          useSession.temporal.getState().undo();
-        }
+        if (e.shiftKey) useSession.temporal.getState().redo();
+        else useSession.temporal.getState().undo();
         return;
       }
       if (meta && e.key.toLowerCase() === 'y' && !editable) {
@@ -31,9 +28,9 @@ export function useKeyboardShortcuts() {
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && !editable) {
         const sel = useSession.getState().selection;
-        if (sel?.kind === 'image') {
+        if (sel?.kind === 'layer') {
           e.preventDefault();
-          useSession.getState().clearImage();
+          useSession.getState().removeLayer(sel.id);
         }
       }
 

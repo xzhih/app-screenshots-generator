@@ -11,6 +11,10 @@ type Props = {
   scale: number;
   allowRotation: boolean;
   aspectLock: boolean;
+  /** Aspect ratio (w/h) to enforce when locked; defaults to current width/height. */
+  aspectRatio?: number;
+  canvasWidth?: number;
+  canvasHeight?: number;
   onResize: (patch: { x?: number; y?: number; width?: number; height?: number }) => void;
   onRotate?: (rotation: number) => void;
 };
@@ -48,11 +52,13 @@ export function SelectionFrame({
   scale,
   allowRotation,
   aspectLock,
+  aspectRatio,
   onResize,
   onRotate,
 }: Props) {
-  const latestProps = useRef({ x, y, width, height, rotation, scale, aspectLock, onResize, onRotate });
-  latestProps.current = { x, y, width, height, rotation, scale, aspectLock, onResize, onRotate };
+  // canvasWidth/canvasHeight reserved for future edge snapping; not yet used.
+  const latestProps = useRef({ x, y, width, height, rotation, scale, aspectLock, aspectRatio, onResize, onRotate });
+  latestProps.current = { x, y, width, height, rotation, scale, aspectLock, aspectRatio, onResize, onRotate };
 
   const handleResizeStart = (handle: Handle) => (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -60,57 +66,89 @@ export function SelectionFrame({
     const startX = e.clientX;
     const startY = e.clientY;
     const snap = { ...latestProps.current };
-    const start = { x: snap.x, y: snap.y, w: snap.width, h: snap.height };
     const { fx, fy } = FACTORS[handle];
+    const MIN = 20;
+
+    // Determine the locked aspect ratio (may toggle with shift mid-drag).
+    // The "canonical" ratio when locked is the explicit aspectRatio (image's
+    // natural ratio), falling back to the current dims' ratio.
+    const canonicalRatio =
+      snap.aspectRatio && snap.aspectRatio > 0
+        ? snap.aspectRatio
+        : snap.height > 0
+          ? snap.width / snap.height
+          : 1;
+
+    // Conform start dimensions to canonical ratio when locked, so subsequent
+    // math is just uniform scaling. Without this, clicking a handle on a
+    // drifted box would cause a visible jump on the first pointermove.
+    let sx = snap.x;
+    let sy = snap.y;
+    let sw = snap.width;
+    let sh = snap.height;
+    if (snap.aspectLock) {
+      const conformedW = Math.max(MIN, Math.round(sh * canonicalRatio));
+      const conformedH = Math.max(MIN, Math.round(conformedW / canonicalRatio));
+      // Anchor conform around the FAR corner from this handle so the dragged
+      // corner stays under the cursor on the first move.
+      const dw = conformedW - sw;
+      const dh = conformedH - sh;
+      if (fx < 0) sx -= dw;
+      else if (fx === 0) sx -= dw / 2;
+      if (fy < 0) sy -= dh;
+      else if (fy === 0) sy -= dh / 2;
+      sw = conformedW;
+      sh = conformedH;
+    }
+    const start = { x: sx, y: sy, w: sw, h: sh };
 
     const move = (ev: PointerEvent) => {
-      const { scale: s, aspectLock: lock } = latestProps.current;
-      const dx = (ev.clientX - startX) / s;
-      const dy = (ev.clientY - startY) / s;
+      const { scale: viewScale, aspectLock: lock } = latestProps.current;
+      const dx = (ev.clientX - startX) / viewScale;
+      const dy = (ev.clientY - startY) / viewScale;
+      const lockAspect = lock || ev.shiftKey;
+      const ratio = canonicalRatio;
 
-      let newW = start.w + fx * dx;
-      let newH = start.h + fy * dy;
+      let newW: number;
+      let newH: number;
+
+      if (lockAspect) {
+        // Uniform scale `k` of start dims (which already conform to ratio).
+        let k: number;
+        if (fx !== 0 && fy !== 0) {
+          // Corner: project cursor delta onto locked-ratio diagonal.
+          const denom = start.w * start.w + start.h * start.h;
+          k = 1 + (start.w * (fx * dx) + start.h * (fy * dy)) / denom;
+        } else if (fx !== 0) {
+          // East/West edge.
+          k = (start.w + fx * dx) / start.w;
+        } else {
+          // North/South edge.
+          k = (start.h + fy * dy) / start.h;
+        }
+        const minK = Math.max(MIN / start.w, MIN / start.h);
+        if (k < minK) k = minK;
+        newW = Math.max(MIN, Math.round(start.w * k));
+        newH = Math.max(MIN, Math.round(newW / ratio));
+      } else {
+        // Free transform.
+        newW = fx === 0 ? start.w : Math.max(MIN, Math.round(start.w + fx * dx));
+        newH = fy === 0 ? start.h : Math.max(MIN, Math.round(start.h + fy * dy));
+      }
+
+      // Anchor at the far corner/edge from the dragged handle.
       let newX = start.x;
       let newY = start.y;
-      if (fx < 0) newX = start.x + dx;
-      if (fy < 0) newY = start.y + dy;
-
-      const lockAspect = (lock || ev.shiftKey) && fx !== 0 && fy !== 0;
-      if (lockAspect) {
-        const ratio = start.w / start.h;
-        if (Math.abs(dx) > Math.abs(dy)) {
-          newH = newW / ratio;
-          if (fy < 0) newY = start.y + (start.h - newH);
-        } else {
-          newW = newH * ratio;
-          if (fx < 0) newX = start.x + (start.w - newW);
-        }
-      }
-
-      const MIN = 20;
-      if (newW < MIN) {
-        if (fx < 0) newX = start.x + (start.w - MIN);
-        newW = MIN;
-      }
-      if (newH < MIN) {
-        if (fy < 0) newY = start.y + (start.h - MIN);
-        newH = MIN;
-      }
-
-      if (fx === 0) {
-        newW = start.w;
-        newX = start.x;
-      }
-      if (fy === 0) {
-        newH = start.h;
-        newY = start.y;
-      }
+      if (fx < 0) newX = start.x + (start.w - newW);
+      else if (fx === 0 && lockAspect) newX = start.x + (start.w - newW) / 2;
+      if (fy < 0) newY = start.y + (start.h - newH);
+      else if (fy === 0 && lockAspect) newY = start.y + (start.h - newH) / 2;
 
       latestProps.current.onResize({
         x: Math.round(newX),
         y: Math.round(newY),
-        width: Math.round(newW),
-        height: Math.round(newH),
+        width: newW,
+        height: newH,
       });
     };
 
