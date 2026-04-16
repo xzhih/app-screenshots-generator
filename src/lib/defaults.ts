@@ -1,7 +1,8 @@
-import { PLATFORMS, type Platform } from './platforms';
+import { PLATFORMS, type FixedPlatform } from './platforms';
 import type {
   Frame,
   ImageLayer,
+  Orientation,
   TextLayer,
   Workspace,
 } from '../store/session';
@@ -9,7 +10,7 @@ import { getCanvasSize } from '../store/session';
 import { uid } from './id';
 import { DEFAULT_BACKGROUND } from './backgrounds';
 
-export function createDefaultWorkspace(platform: Platform, name: string): Workspace {
+export function createDefaultWorkspace(platform: FixedPlatform, name: string): Workspace {
   const spec = PLATFORMS[platform];
   const ws: Workspace = {
     id: uid(),
@@ -23,8 +24,23 @@ export function createDefaultWorkspace(platform: Platform, name: string): Worksp
   return ws;
 }
 
+export function createCustomWorkspace(name: string, width: number, height: number): Workspace {
+  const orientation: Orientation = width > height ? 'landscape' : 'portrait';
+  const ws: Workspace = {
+    id: uid(),
+    name,
+    platform: 'custom',
+    orientation,
+    custom: { width, height },
+    background: DEFAULT_BACKGROUND,
+    frames: [],
+  };
+  ws.frames.push(createDefaultFrame(ws, 0));
+  return ws;
+}
+
 export function createDefaultFrame(
-  workspace: Pick<Workspace, 'platform' | 'orientation'>,
+  workspace: Pick<Workspace, 'platform' | 'orientation' | 'custom'>,
   index: number,
 ): Frame {
   const { width, height } = getCanvasSize(workspace);
@@ -56,7 +72,7 @@ function defaultTextLayer(w: number, h: number): TextLayer {
 }
 
 export function createTextLayer(
-  workspace: Pick<Workspace, 'platform' | 'orientation'>,
+  workspace: Pick<Workspace, 'platform' | 'orientation' | 'custom'>,
 ): TextLayer {
   const { width, height } = getCanvasSize(workspace);
   const layer = defaultTextLayer(width, height);
@@ -69,7 +85,7 @@ export function createTextLayer(
 }
 
 export function createImageLayer(
-  workspace: Pick<Workspace, 'platform' | 'orientation'>,
+  workspace: Pick<Workspace, 'platform' | 'orientation' | 'custom'>,
   src: string,
   naturalW: number,
   naturalH: number,

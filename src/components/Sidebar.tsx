@@ -11,7 +11,7 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { useSession, getCanvasSize, type Workspace } from '../store/session';
-import { PLATFORM_LIST, PLATFORMS, type Platform } from '../lib/platforms';
+import { PLATFORM_LIST, platformLabel, type FixedPlatform } from '../lib/platforms';
 import { importJSON } from '../lib/export';
 import { useListReorder } from '../hooks/useListReorder';
 
@@ -19,13 +19,14 @@ type Props = {
   onExport: (frameId: string) => void;
 };
 
-type Mode = 'closed' | 'menu' | 'platforms';
+type Mode = 'closed' | 'menu' | 'platforms' | 'custom';
 
 export function Sidebar({ onExport }: Props) {
   const workspaces = useSession((s) => s.workspaces);
   const activeWorkspaceId = useSession((s) => s.activeWorkspaceId);
   const activeFrameId = useSession((s) => s.activeFrameId);
   const addWorkspace = useSession((s) => s.addWorkspace);
+  const addCustomWorkspace = useSession((s) => s.addCustomWorkspace);
   const dupWorkspace = useSession((s) => s.duplicateWorkspace);
   const removeWorkspace = useSession((s) => s.removeWorkspace);
   const renameWorkspace = useSession((s) => s.renameWorkspace);
@@ -117,7 +118,7 @@ export function Sidebar({ onExport }: Props) {
             <button
               key={p.id}
               onClick={() => {
-                addWorkspace(p.id as Platform);
+                addWorkspace(p.id as FixedPlatform);
                 setMode('closed');
               }}
               className="text-left bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded px-2 py-1.5 text-xs flex items-center justify-between"
@@ -128,7 +129,24 @@ export function Sidebar({ onExport }: Props) {
               </span>
             </button>
           ))}
+          <button
+            onClick={() => setMode('custom')}
+            className="text-left bg-neutral-900 hover:bg-neutral-800 border border-dashed border-neutral-700 rounded px-2 py-1.5 text-xs flex items-center justify-between"
+          >
+            <span>Custom…</span>
+            <span className="text-neutral-500 font-mono">w × h</span>
+          </button>
         </div>
+      )}
+
+      {mode === 'custom' && (
+        <CustomWorkspaceForm
+          onCancel={() => setMode('platforms')}
+          onCreate={(name, w, h) => {
+            addCustomWorkspace(name, w, h);
+            setMode('closed');
+          }}
+        />
       )}
 
       <div className="flex-1 overflow-y-auto">
@@ -268,7 +286,7 @@ function WorkspaceItem({
   onExportFrame: (frameId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const spec = PLATFORMS[workspace.platform];
+  const label = platformLabel(workspace.platform);
   const size = getCanvasSize(workspace);
 
   const frameReorder = useListReorder(workspace.frames, (id, toIndex) => {
@@ -301,7 +319,7 @@ function WorkspaceItem({
           <GripVertical size={12} />
         </div>
         <span className="text-[10px] text-neutral-500 uppercase shrink-0">
-          {spec.label}
+          {label}
         </span>
         <button
           onClick={(e) => {
@@ -524,6 +542,106 @@ function EditableName({
       >
         <Pencil size={11} />
       </button>
+    </div>
+  );
+}
+
+function CustomWorkspaceForm({
+  onCancel,
+  onCreate,
+}: {
+  onCancel: () => void;
+  onCreate: (name: string, width: number, height: number) => void;
+}) {
+  const [name, setName] = useState('Custom');
+  const [width, setWidth] = useState('1080');
+  const [height, setHeight] = useState('1920');
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      nameRef.current?.focus();
+      nameRef.current?.select();
+    });
+  }, []);
+
+  const w = parseInt(width, 10);
+  const h = parseInt(height, 10);
+  const trimmedName = name.trim();
+  const valid =
+    trimmedName.length > 0 &&
+    Number.isFinite(w) &&
+    w > 0 &&
+    Number.isFinite(h) &&
+    h > 0;
+
+  const submit = () => {
+    if (!valid) return;
+    onCreate(trimmedName, w, h);
+  };
+
+  return (
+    <div className="p-2 border-b border-neutral-800 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-neutral-500">
+        Custom size
+      </div>
+      <input
+        ref={nameRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') submit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        placeholder="Name"
+        className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+      />
+      <div className="flex gap-1">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          value={width}
+          onChange={(e) => setWidth(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') onCancel();
+          }}
+          placeholder="Width"
+          className="w-1/2 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-blue-500"
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          value={height}
+          onChange={(e) => setHeight(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') onCancel();
+          }}
+          placeholder="Height"
+          className="w-1/2 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-blue-500"
+        />
+      </div>
+      <div className="flex gap-1 justify-end">
+        <button
+          onClick={onCancel}
+          className="text-xs px-2 py-1 rounded hover:bg-neutral-800 text-neutral-400"
+        >
+          Cancel
+        </button>
+        <button
+          disabled={!valid}
+          onClick={submit}
+          className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white"
+        >
+          Create
+        </button>
+      </div>
     </div>
   );
 }

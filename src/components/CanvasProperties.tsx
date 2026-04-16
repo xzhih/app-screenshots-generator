@@ -1,11 +1,13 @@
 import { RotateCw } from 'lucide-react';
 import { useSession, type Workspace, getCanvasSize } from '../store/session';
-import { PLATFORMS } from '../lib/platforms';
+import { platformLabel } from '../lib/platforms';
 
 export function CanvasProperties({ workspace }: { workspace: Workspace }) {
   const setOrientation = useSession((s) => s.setOrientation);
-  const spec = PLATFORMS[workspace.platform];
-  const canToggle = workspace.platform === 'iphone' || workspace.platform === 'ipad';
+  const canToggle =
+    workspace.platform === 'iphone' ||
+    workspace.platform === 'ipad' ||
+    workspace.platform === 'custom';
   const size = getCanvasSize(workspace);
 
   return (
@@ -13,7 +15,7 @@ export function CanvasProperties({ workspace }: { workspace: Workspace }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs uppercase tracking-wider text-neutral-500">Canvas</div>
-          <div className="text-sm font-medium">{spec.label}</div>
+          <div className="text-sm font-medium">{platformLabel(workspace.platform)}</div>
           <div className="text-[11px] font-mono text-neutral-500 mt-0.5">
             {size.width} × {size.height}
           </div>

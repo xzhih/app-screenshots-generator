@@ -3,9 +3,10 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { temporal } from 'zundo';
 import type { TemporalState } from 'zundo';
 import { useStore } from 'zustand';
-import { PLATFORMS, type Platform } from '../lib/platforms';
+import { PLATFORMS, type FixedPlatform, type Platform } from '../lib/platforms';
 import {
   createDefaultWorkspace,
+  createCustomWorkspace,
   createDefaultFrame,
   createTextLayer,
   createImageLayer,
@@ -65,11 +66,19 @@ export type Frame = {
   background?: Background;
 };
 
+export type CustomSize = { width: number; height: number };
+
 export type Workspace = {
   id: string;
   name: string;
   platform: Platform;
   orientation: Orientation;
+  /**
+   * Present only when platform === 'custom'. Stored as the "native" dimensions
+   * (the ones entered at creation); getCanvasSize swaps them when orientation
+   * differs from the native orientation, mirroring iPhone/iPad behavior.
+   */
+  custom?: CustomSize;
   /** Shared default background for frames that don't override. */
   background: Background;
   frames: Frame[];
@@ -102,17 +111,22 @@ const EMPTY_DRAG: DragState = {
   snapY: false,
 };
 
-export function getCanvasSize(w: Pick<Workspace, 'platform' | 'orientation'>): {
+export function getCanvasSize(
+  w: Pick<Workspace, 'platform' | 'orientation' | 'custom'>,
+): {
   width: number;
   height: number;
 } {
-  const spec = PLATFORMS[w.platform];
+  const base =
+    w.platform === 'custom'
+      ? w.custom ?? { width: 1080, height: 1920 }
+      : PLATFORMS[w.platform];
+  const nativeLandscape = base.width > base.height;
   const wantLandscape = w.orientation === 'landscape';
-  const isNativeLandscape = spec.orientation === 'landscape';
-  if (wantLandscape !== isNativeLandscape) {
-    return { width: spec.height, height: spec.width };
+  if (wantLandscape !== nativeLandscape) {
+    return { width: base.height, height: base.width };
   }
-  return { width: spec.width, height: spec.height };
+  return { width: base.width, height: base.height };
 }
 
 /** The effective background for a frame: its override or the workspace default. */
@@ -140,7 +154,8 @@ type SessionState = {
   drag: DragState;
 
   // Workspace
-  addWorkspace: (p: Platform) => void;
+  addWorkspace: (p: FixedPlatform) => void;
+  addCustomWorkspace: (name: string, width: number, height: number) => void;
   duplicateWorkspace: (id: string) => void;
   removeWorkspace: (id: string) => void;
   renameWorkspace: (id: string, name: string) => void;
@@ -173,7 +188,7 @@ type SessionState = {
   importJSON: (workspaces: Workspace[]) => void;
 };
 
-function workspaceNameForPlatform(existing: Workspace[], platform: Platform): string {
+function workspaceNameForPlatform(existing: Workspace[], platform: FixedPlatform): string {
   const base = PLATFORMS[platform].label;
   const sameKind = existing.filter((w) => w.platform === platform).length;
   return sameKind === 0 ? base : `${base} ${sameKind + 1}`;
@@ -227,6 +242,19 @@ export const useSession = create<SessionState>()(
         addWorkspace: (p) => {
           const name = workspaceNameForPlatform(get().workspaces, p);
           const ws = createDefaultWorkspace(p, name);
+          const firstFrame = ws.frames[0];
+          set((s) => ({
+            workspaces: [...s.workspaces, ws],
+            activeWorkspaceId: ws.id,
+            activeFrameId: firstFrame?.id ?? null,
+            selection: firstFrame?.layers[0]
+              ? { kind: 'layer', id: firstFrame.layers[0].id }
+              : null,
+          }));
+        },
+
+        addCustomWorkspace: (name, width, height) => {
+          const ws = createCustomWorkspace(name, width, height);
           const firstFrame = ws.frames[0];
           set((s) => ({
             workspaces: [...s.workspaces, ws],
@@ -591,7 +619,8 @@ type LegacyImageFields = Omit<ImageLayer, 'id' | 'kind'>;
 type LegacyScreenshot = {
   id?: string;
   name?: string;
-  platform?: Platform;
+  // Legacy format predates the 'custom' platform, so only fixed platforms are possible.
+  platform?: FixedPlatform;
   orientation?: Orientation;
   layers?: Layer[];
   background?: unknown;
@@ -601,7 +630,7 @@ type LegacyScreenshot = {
 };
 
 function migrateScreenshotToFrame(s: LegacyScreenshot): {
-  platform: Platform;
+  platform: FixedPlatform;
   orientation: Orientation;
   background: Background;
   frame: Frame;
@@ -649,7 +678,7 @@ function migrateScreenshotToFrame(s: LegacyScreenshot): {
 
 export function legacyScreenshotsToWorkspaces(screenshots: LegacyScreenshot[]): Workspace[] {
   const migrated = screenshots.map(migrateScreenshotToFrame);
-  const byPlatform = new Map<Platform, typeof migrated>();
+  const byPlatform = new Map<FixedPlatform, typeof migrated>();
   for (const item of migrated) {
     if (!byPlatform.has(item.platform)) byPlatform.set(item.platform, []);
     byPlatform.get(item.platform)!.push(item);
