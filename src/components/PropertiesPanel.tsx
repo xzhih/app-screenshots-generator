@@ -1,4 +1,4 @@
-import { useSession } from '../store/session';
+import { useSession, findFrame } from '../store/session';
 import { LayerList } from './LayerList';
 import { TextProperties } from './TextProperties';
 import { ImageProperties } from './ImageProperties';
@@ -7,7 +7,9 @@ import { CanvasProperties } from './CanvasProperties';
 
 export function PropertiesPanel() {
   const selection = useSession((s) => s.selection);
-  const active = useSession((s) => s.screenshots.find((x) => x.id === s.activeId) ?? null);
+  const workspaces = useSession((s) => s.workspaces);
+  const activeFrameId = useSession((s) => s.activeFrameId);
+  const active = findFrame(workspaces, activeFrameId);
 
   if (!active) {
     return (
@@ -17,17 +19,18 @@ export function PropertiesPanel() {
     );
   }
 
+  const { workspace, frame } = active;
   const selectedLayer =
-    selection?.kind === 'layer' ? active.layers.find((l) => l.id === selection.id) ?? null : null;
+    selection?.kind === 'layer' ? frame.layers.find((l) => l.id === selection.id) ?? null : null;
 
   return (
     <aside className="w-80 shrink-0 bg-neutral-950 border-l border-neutral-800 flex flex-col">
       <div className="p-3 border-b border-neutral-800">
-        <CanvasProperties screenshot={active} />
+        <CanvasProperties workspace={workspace} />
       </div>
 
       <div className="border-b border-neutral-800">
-        <LayerList screenshot={active} />
+        <LayerList workspace={workspace} frame={frame} />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

@@ -1,12 +1,12 @@
 import { RotateCw } from 'lucide-react';
-import { useSession, type Screenshot, getCanvasSize } from '../store/session';
+import { useSession, type Workspace, getCanvasSize } from '../store/session';
 import { PLATFORMS } from '../lib/platforms';
 
-export function CanvasProperties({ screenshot }: { screenshot: Screenshot }) {
+export function CanvasProperties({ workspace }: { workspace: Workspace }) {
   const setOrientation = useSession((s) => s.setOrientation);
-  const spec = PLATFORMS[screenshot.platform];
-  const canToggle = screenshot.platform === 'iphone' || screenshot.platform === 'ipad';
-  const size = getCanvasSize(screenshot);
+  const spec = PLATFORMS[workspace.platform];
+  const canToggle = workspace.platform === 'iphone' || workspace.platform === 'ipad';
+  const size = getCanvasSize(workspace);
 
   return (
     <div>
@@ -22,13 +22,13 @@ export function CanvasProperties({ screenshot }: { screenshot: Screenshot }) {
         {canToggle && (
           <button
             onClick={() =>
-              setOrientation(screenshot.orientation === 'portrait' ? 'landscape' : 'portrait')
+              setOrientation(workspace.orientation === 'portrait' ? 'landscape' : 'portrait')
             }
             title="Toggle orientation"
             className="flex items-center gap-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded px-2 py-1 text-xs"
           >
             <RotateCw size={12} />
-            {screenshot.orientation === 'portrait' ? 'Portrait' : 'Landscape'}
+            {workspace.orientation === 'portrait' ? 'Portrait' : 'Landscape'}
           </button>
         )}
       </div>

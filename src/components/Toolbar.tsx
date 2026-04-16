@@ -1,10 +1,38 @@
-import { Undo2, Redo2, Download, FileJson, Image as ImageIcon } from 'lucide-react';
-import { useSession } from '../store/session';
-import { exportJSON, exportScreenshotPng } from '../lib/export';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Undo2,
+  Redo2,
+  Download,
+  FileJson,
+  ChevronDown,
+  Image as ImageIcon,
+  FileArchive,
+} from 'lucide-react';
+import { useSession, findFrame } from '../store/session';
+import { exportJSON, exportFramePng, exportWorkspaceZip } from '../lib/export';
 
 export function Toolbar() {
-  const screenshots = useSession((s) => s.screenshots);
-  const active = useSession((s) => s.screenshots.find((x) => x.id === s.activeId) ?? null);
+  const workspaces = useSession((s) => s.workspaces);
+  const activeWorkspaceId = useSession((s) => s.activeWorkspaceId);
+  const activeFrameId = useSession((s) => s.activeFrameId);
+  const active = findFrame(workspaces, activeFrameId);
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? null;
+  const workspaceFrameCount = activeWorkspace?.frames.length ?? 0;
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
+
+  const canExportFrame = !!active;
+  const canExportWorkspace = !!activeWorkspace && workspaceFrameCount > 0;
+  const anyExport = canExportFrame || canExportWorkspace;
 
   return (
     <div className="h-12 shrink-0 bg-neutral-950 border-b border-neutral-800 flex items-center px-3 gap-2">
@@ -26,25 +54,81 @@ export function Toolbar() {
 
       <div className="ml-auto flex items-center gap-2">
         <Btn
-          onClick={() => exportJSON(screenshots)}
-          disabled={screenshots.length === 0}
+          onClick={() => exportJSON(workspaces)}
+          disabled={workspaces.length === 0}
           title="Export all configs as JSON"
         >
           <FileJson size={14} />
           <span>Export JSON</span>
         </Btn>
-        <Btn
-          onClick={() => active && exportScreenshotPng(active)}
-          disabled={!active}
-          title="Export current PNG"
-          primary
-        >
-          <ImageIcon size={14} />
-          <Download size={14} />
-          <span>Export PNG</span>
-        </Btn>
+        <div className="relative" ref={menuRef}>
+          <Btn
+            onClick={() => setMenuOpen((v) => !v)}
+            disabled={!anyExport}
+            title="Export…"
+            primary
+          >
+            <Download size={14} />
+            <span>Export</span>
+            <ChevronDown size={14} />
+          </Btn>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-56 bg-neutral-900 border border-neutral-800 rounded shadow-lg z-10 overflow-hidden">
+              <MenuItem
+                disabled={!canExportFrame}
+                onClick={() => {
+                  if (active) void exportFramePng(active.workspace, active.frame);
+                  setMenuOpen(false);
+                }}
+              >
+                <ImageIcon size={14} />
+                <div className="flex-1 text-left">
+                  <div>Export current frame</div>
+                  <div className="text-[10px] text-neutral-500">PNG</div>
+                </div>
+              </MenuItem>
+              <MenuItem
+                disabled={!canExportWorkspace}
+                onClick={() => {
+                  if (activeWorkspace) void exportWorkspaceZip(activeWorkspace);
+                  setMenuOpen(false);
+                }}
+              >
+                <FileArchive size={14} />
+                <div className="flex-1 text-left">
+                  <div>Export current workspace</div>
+                  <div className="text-[10px] text-neutral-500">
+                    {canExportWorkspace
+                      ? `${workspaceFrameCount} frame${workspaceFrameCount === 1 ? '' : 's'} · ZIP`
+                      : 'ZIP'}
+                  </div>
+                </div>
+              </MenuItem>
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-200 hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+    >
+      {children}
+    </button>
   );
 }
 

@@ -2,6 +2,7 @@ import { HexColorPicker } from 'react-colorful';
 import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { useSession, type TextLayer, type FontWeight } from '../store/session';
 import { Field, NumberInput, Section, SectionTitle, TextArea } from './ui';
+import { LinkControl } from './LinkControl';
 
 const WEIGHTS: FontWeight[] = [400, 500, 600, 700, 800, 900];
 
@@ -12,6 +13,8 @@ export function TextProperties({ layer }: { layer: TextLayer }) {
   return (
     <div className="space-y-4">
       <SectionTitle>Text</SectionTitle>
+
+      <LinkControl layer={layer} />
 
       <Field label="Content">
         <TextArea value={layer.text} onChange={(v) => update({ text: v })} rows={3} />

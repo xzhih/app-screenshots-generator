@@ -1,10 +1,32 @@
-import { ChevronUp, ChevronDown, Trash2, Copy, Type, Image as ImageIcon, Upload } from 'lucide-react';
+import {
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Copy,
+  Type,
+  Image as ImageIcon,
+  Upload,
+  Link as LinkIcon,
+  GripVertical,
+} from 'lucide-react';
 import { useRef } from 'react';
-import { useSession, type Screenshot } from '../store/session';
+import {
+  useSession,
+  effectiveBackground,
+  type Frame,
+  type Workspace,
+} from '../store/session';
 import { fileToDataURL, loadImageDimensions } from '../lib/file';
 import { backgroundCSS } from '../lib/backgrounds';
+import { useListReorder } from '../hooks/useListReorder';
 
-export function LayerList({ screenshot }: { screenshot: Screenshot }) {
+export function LayerList({
+  workspace,
+  frame,
+}: {
+  workspace: Workspace;
+  frame: Frame;
+}) {
   const selection = useSession((s) => s.selection);
   const setSelection = useSession((s) => s.setSelection);
   const addTextLayer = useSession((s) => s.addTextLayer);
@@ -12,6 +34,7 @@ export function LayerList({ screenshot }: { screenshot: Screenshot }) {
   const removeLayer = useSession((s) => s.removeLayer);
   const duplicateLayer = useSession((s) => s.duplicateLayer);
   const reorderLayer = useSession((s) => s.reorderLayer);
+  const moveLayer = useSession((s) => s.moveLayer);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -25,7 +48,15 @@ export function LayerList({ screenshot }: { screenshot: Screenshot }) {
   }
 
   // Render top-most first (reverse of z-order which is array order)
-  const ordered = [...screenshot.layers].reverse();
+  const ordered = [...frame.layers].reverse();
+
+  // Drag state operates on the visible (reversed) list. The `onMove` callback
+  // translates a visual target index back to the array index: visual 0 is the
+  // topmost layer, which lives at the end of the array.
+  const reorder = useListReorder(ordered, (id, visualTo) => {
+    const arrayTo = frame.layers.length - 1 - visualTo;
+    moveLayer(id, arrayTo);
+  });
 
   return (
     <div className="p-3">
@@ -70,7 +101,7 @@ export function LayerList({ screenshot }: { screenshot: Screenshot }) {
         <div
           className="w-4 h-4 rounded border border-neutral-700"
           style={{
-            background: backgroundCSS(screenshot.background),
+            background: backgroundCSS(effectiveBackground(workspace, frame)),
           }}
         />
         <span className="flex-1 text-left">Background</span>
@@ -79,19 +110,49 @@ export function LayerList({ screenshot }: { screenshot: Screenshot }) {
       {ordered.length === 0 ? (
         <div className="text-[11px] text-neutral-600 py-2">No layers yet.</div>
       ) : (
-        <ul className="space-y-1 max-h-48 overflow-y-auto">
-          {ordered.map((l) => {
+        <ul
+          className="space-y-1 max-h-48 overflow-y-auto"
+          onDrop={reorder.commit}
+          onDragEnd={reorder.cancel}
+        >
+          {ordered.map((l, i) => {
             const active = selection?.kind === 'layer' && selection.id === l.id;
+            const showDropAbove =
+              reorder.isDragging && reorder.dropIndex === i && reorder.dragId !== l.id;
             return (
-              <li key={l.id}>
+              <li key={l.id} className="relative">
+                <div
+                  aria-hidden
+                  className="absolute -top-0.5 left-0 right-0 h-0.5 rounded pointer-events-none"
+                  style={{ background: showDropAbove ? '#3b82f6' : 'transparent' }}
+                />
                 <div
                   onClick={() => setSelection({ kind: 'layer', id: l.id })}
+                  onDragOver={reorder.hoverGap(i)}
+                  onDrop={reorder.commit}
                   className={`group flex items-center gap-1.5 px-2 py-1.5 rounded text-xs border cursor-pointer ${
                     active
                       ? 'bg-blue-500/10 border-blue-500'
                       : 'bg-neutral-900/50 border-neutral-800 hover:bg-neutral-900'
-                  }`}
+                  } ${reorder.dragId === l.id ? 'opacity-40' : ''}`}
                 >
+                  <div
+                    draggable
+                    onDragStart={reorder.startDrag(l.id)}
+                    onDragEnd={reorder.cancel}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-neutral-600 hover:text-neutral-300 cursor-grab active:cursor-grabbing shrink-0"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical size={11} />
+                  </div>
+                  {l.linkId && (
+                    <LinkIcon
+                      size={10}
+                      className="text-blue-400/80 shrink-0"
+                      aria-label={`Linked: ${l.linkId}`}
+                    />
+                  )}
                   {l.kind === 'text' ? <Type size={11} /> : <ImageIcon size={11} />}
                   <span className="flex-1 truncate">
                     {l.kind === 'text' ? l.text || '(empty)' : 'Image'}
@@ -142,6 +203,23 @@ export function LayerList({ screenshot }: { screenshot: Screenshot }) {
               </li>
             );
           })}
+          {/* Trailing gap so a layer can be dropped past the last row. */}
+          <li
+            aria-hidden
+            className="relative h-2"
+            onDragOver={reorder.hoverGap(ordered.length)}
+            onDrop={reorder.commit}
+          >
+            <div
+              className="absolute top-0 left-0 right-0 h-0.5 rounded pointer-events-none"
+              style={{
+                background:
+                  reorder.isDragging && reorder.dropIndex === ordered.length
+                    ? '#3b82f6'
+                    : 'transparent',
+              }}
+            />
+          </li>
         </ul>
       )}
     </div>

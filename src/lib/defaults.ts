@@ -1,18 +1,37 @@
 import { PLATFORMS, type Platform } from './platforms';
-import type { Screenshot, TextLayer, ImageLayer } from '../store/session';
+import type {
+  Frame,
+  ImageLayer,
+  TextLayer,
+  Workspace,
+} from '../store/session';
 import { getCanvasSize } from '../store/session';
 import { uid } from './id';
 import { DEFAULT_BACKGROUND } from './backgrounds';
 
-export function createDefaultScreenshot(platform: Platform, index: number): Screenshot {
+export function createDefaultWorkspace(platform: Platform, name: string): Workspace {
   const spec = PLATFORMS[platform];
-  return {
+  const ws: Workspace = {
     id: uid(),
-    name: `${spec.label}-${index + 1}`,
+    name,
     platform,
     orientation: spec.orientation,
-    layers: [defaultTextLayer(spec.width, spec.height)],
     background: DEFAULT_BACKGROUND,
+    frames: [],
+  };
+  ws.frames.push(createDefaultFrame(ws, 0));
+  return ws;
+}
+
+export function createDefaultFrame(
+  workspace: Pick<Workspace, 'platform' | 'orientation'>,
+  index: number,
+): Frame {
+  const { width, height } = getCanvasSize(workspace);
+  return {
+    id: uid(),
+    name: `Frame ${index + 1}`,
+    layers: [defaultTextLayer(width, height)],
   };
 }
 
@@ -36,8 +55,10 @@ function defaultTextLayer(w: number, h: number): TextLayer {
   };
 }
 
-export function createTextLayer(screenshot: Pick<Screenshot, 'platform' | 'orientation'>): TextLayer {
-  const { width, height } = getCanvasSize(screenshot);
+export function createTextLayer(
+  workspace: Pick<Workspace, 'platform' | 'orientation'>,
+): TextLayer {
+  const { width, height } = getCanvasSize(workspace);
   const layer = defaultTextLayer(width, height);
   // Offset slightly so it doesn't overlap exactly with existing text
   layer.y = Math.round(height * 0.2);
@@ -48,12 +69,12 @@ export function createTextLayer(screenshot: Pick<Screenshot, 'platform' | 'orien
 }
 
 export function createImageLayer(
-  screenshot: Pick<Screenshot, 'platform' | 'orientation'>,
+  workspace: Pick<Workspace, 'platform' | 'orientation'>,
   src: string,
   naturalW: number,
   naturalH: number,
 ): ImageLayer {
-  const { width, height } = getCanvasSize(screenshot);
+  const { width, height } = getCanvasSize(workspace);
   const targetW = Math.round(width * 0.6);
   const scale = targetW / naturalW;
   const targetH = Math.round(naturalH * scale);

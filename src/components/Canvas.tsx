@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Minus, Plus, Maximize2 } from 'lucide-react';
-import { useSession, getCanvasSize } from '../store/session';
+import { useSession, findFrame, effectiveBackground, getCanvasSize } from '../store/session';
 import { TextLayer } from './TextLayer';
 import { ImageLayer } from './ImageLayer';
 import { SelectionFrame } from './SelectionFrame';
@@ -12,7 +12,9 @@ const MAX_SCALE = 4;
 const ZOOM_STEPS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 export function Canvas() {
-  const active = useSession((s) => s.screenshots.find((x) => x.id === s.activeId) ?? null);
+  const workspaces = useSession((s) => s.workspaces);
+  const activeFrameId = useSession((s) => s.activeFrameId);
+  const active = findFrame(workspaces, activeFrameId);
   const selection = useSession((s) => s.selection);
   const setSelection = useSession((s) => s.setSelection);
   const addImageLayer = useSession((s) => s.addImageLayer);
@@ -32,7 +34,7 @@ export function Canvas() {
     mouseY: number;
   } | null>(null);
 
-  const size = active ? getCanvasSize(active) : null;
+  const size = active ? getCanvasSize(active.workspace) : null;
   const scale = userScale ?? fitScale;
 
   // Recompute fit scale when canvas size or container size changes.
@@ -53,10 +55,10 @@ export function Canvas() {
     return () => obs.disconnect();
   }, [size?.width, size?.height]);
 
-  // Reset user zoom when switching canvas.
+  // Reset user zoom when switching frame.
   useEffect(() => {
     setUserScale(null);
-  }, [active?.id]);
+  }, [active?.frame.id]);
 
   // Apply a zoom, anchoring the given viewport point (or the viewport center).
   const zoomTo = (nextRaw: number, viewportPoint?: { x: number; y: number }) => {
@@ -167,7 +169,7 @@ export function Canvas() {
         className="flex-1 flex items-center justify-center text-neutral-500 select-none"
       >
         <div className="text-center">
-          <div className="text-lg mb-2">No screenshot selected</div>
+          <div className="text-lg mb-2">No frame selected</div>
           <div className="text-sm text-neutral-600">Click "+ New" in the sidebar to begin.</div>
         </div>
       </div>
@@ -179,7 +181,7 @@ export function Canvas() {
   const selectedLayerId = selection?.kind === 'layer' ? selection.id : null;
   const selectedLayer =
     selectedLayerId !== null
-      ? active.layers.find((l) => l.id === selectedLayerId) ?? null
+      ? active.frame.layers.find((l) => l.id === selectedLayerId) ?? null
       : null;
   const selectedImageRatio =
     selectedLayer?.kind === 'image' &&
@@ -216,7 +218,7 @@ export function Canvas() {
           style={{
             width: size.width,
             height: size.height,
-            background: backgroundCSS(active.background),
+            background: backgroundCSS(effectiveBackground(active.workspace, active.frame)),
             overflow: 'hidden',
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
@@ -225,7 +227,7 @@ export function Canvas() {
             if (e.target === e.currentTarget) setSelection({ kind: 'background' });
           }}
         >
-          {active.layers.map((layer) =>
+          {active.frame.layers.map((layer) =>
             layer.kind === 'text' ? (
               <TextLayer
                 key={layer.id}

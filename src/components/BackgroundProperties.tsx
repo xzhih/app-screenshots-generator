@@ -12,7 +12,9 @@ import {
 import { Field, NumberInput, Section, SectionTitle } from './ui';
 
 export function BackgroundProperties() {
-  const bg = useSession((s) => s.screenshots.find((x) => x.id === s.activeId)?.background);
+  const bg = useSession((s) =>
+    s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.background,
+  );
   const setBackground = useSession((s) => s.setBackground);
   if (!bg) return null;
 

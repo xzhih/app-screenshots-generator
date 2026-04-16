@@ -3,6 +3,7 @@ import { Lock, Trash2, Unlock, Upload } from 'lucide-react';
 import { useSession, type ImageLayer } from '../store/session';
 import { Field, NumberInput, SectionTitle } from './ui';
 import { fileToDataURL, loadImageDimensions } from '../lib/file';
+import { LinkControl } from './LinkControl';
 
 export function ImageProperties({ layer }: { layer: ImageLayer }) {
   const updateLayer = useSession((s) => s.updateLayer);
@@ -59,6 +60,8 @@ export function ImageProperties({ layer }: { layer: ImageLayer }) {
   return (
     <div className="space-y-4">
       <SectionTitle>Image layer</SectionTitle>
+
+      <LinkControl layer={layer} />
 
       <button
         onClick={() => inputRef.current?.click()}
