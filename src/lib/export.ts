@@ -1,5 +1,6 @@
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
+import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import {
   type Frame,
   type Layer,
@@ -9,6 +10,23 @@ import {
   legacyScreenshotsToWorkspaces,
 } from '../store/session';
 import { backgroundCSS } from './backgrounds';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Cache resolved iconNode arrays so repeat exports don't re-import modules. */
+const iconNodeCache = new Map<string, Promise<IconNodeLike>>();
+
+type IconNodeLike = Array<[string, Record<string, string>]>;
+
+function loadIconNode(name: string): Promise<IconNodeLike> {
+  const cached = iconNodeCache.get(name);
+  if (cached) return cached;
+  const loader = (dynamicIconImports as Record<string, () => Promise<{ __iconNode: IconNodeLike }>>)[name];
+  if (!loader) return Promise.reject(new Error(`Unknown lucide icon: ${name}`));
+  const promise = loader().then((m) => m.__iconNode);
+  iconNodeCache.set(name, promise);
+  return promise;
+}
 
 /**
  * Render a single frame to a PNG data URL. Detaches a full-size DOM tree into
@@ -36,25 +54,29 @@ async function renderFramePng(workspace: Workspace, frame: Frame): Promise<strin
   canvas.style.background = backgroundCSS(background);
   host.appendChild(canvas);
 
-  const imageLoads: Promise<void>[] = [];
+  const pending: Promise<void>[] = [];
 
   for (const layer of frame.layers) {
     if (layer.kind === 'image') {
       const img = buildImageLayer(layer);
       canvas.appendChild(img);
-      imageLoads.push(
+      pending.push(
         new Promise<void>((resolve) => {
           if (img.complete && img.naturalWidth > 0) return resolve();
           img.onload = () => resolve();
           img.onerror = () => resolve();
         }),
       );
-    } else {
+    } else if (layer.kind === 'text') {
       canvas.appendChild(buildTextLayer(layer));
+    } else {
+      const { element, ready } = buildIconLayer(layer);
+      canvas.appendChild(element);
+      pending.push(ready);
     }
   }
 
-  await Promise.all(imageLoads);
+  await Promise.all(pending);
 
   try {
     return await toPng(canvas, {
@@ -121,6 +143,54 @@ function buildImageLayer(layer: Extract<Layer, { kind: 'image' }>): HTMLImageEle
   img.style.transform = `rotate(${layer.rotation}deg)`;
   img.style.transformOrigin = 'center';
   return img;
+}
+
+function buildIconLayer(layer: Extract<Layer, { kind: 'icon' }>): {
+  element: HTMLDivElement;
+  ready: Promise<void>;
+} {
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'absolute';
+  wrapper.style.left = `${layer.x}px`;
+  wrapper.style.top = `${layer.y}px`;
+  wrapper.style.width = `${layer.width}px`;
+  wrapper.style.height = `${layer.height}px`;
+  wrapper.style.transform = `rotate(${layer.rotation}deg)`;
+  wrapper.style.transformOrigin = 'center';
+  wrapper.style.color = layer.color;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('xmlns', SVG_NS);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', String(layer.width));
+  svg.setAttribute('height', String(layer.height));
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', layer.color);
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  // Match DynamicIcon's `absoluteStrokeWidth`: stroke stays visually consistent
+  // across render sizes by normalizing against the 24px viewBox.
+  const size = Math.min(layer.width, layer.height);
+  const strokeWidth = ((layer.strokeWidth ?? 2) * 24) / Math.max(1, size);
+  svg.setAttribute('stroke-width', String(strokeWidth));
+  svg.style.display = 'block';
+  wrapper.appendChild(svg);
+
+  const ready = loadIconNode(layer.name)
+    .then((iconNode) => {
+      for (const [tag, attrs] of iconNode) {
+        const el = document.createElementNS(SVG_NS, tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          el.setAttribute(k, v);
+        }
+        svg.appendChild(el);
+      }
+    })
+    .catch(() => {
+      // Fallback: leave the svg empty rather than failing the whole export.
+    });
+
+  return { element: wrapper, ready };
 }
 
 function buildTextLayer(layer: Extract<Layer, { kind: 'text' }>): HTMLDivElement {

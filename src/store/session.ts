@@ -10,6 +10,7 @@ import {
   createDefaultFrame,
   createTextLayer,
   createImageLayer,
+  createIconLayer,
 } from '../lib/defaults';
 import { uid } from '../lib/id';
 import { normalizeBackground, type Background } from '../lib/backgrounds';
@@ -54,7 +55,25 @@ export type ImageLayer = {
   linkId?: string;
 };
 
-export type Layer = TextLayer | ImageLayer;
+export type IconLayer = {
+  id: string;
+  kind: 'icon';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  /** Lucide icon name (kebab-case, e.g. 'star', 'heart', 'arrow-right'). */
+  name: string;
+  color: string;
+  /** SVG stroke-width in lucide's 24px viewBox units. Defaults to 2. */
+  strokeWidth?: number;
+  aspectLocked?: boolean;
+  /** Optional link group: style fields propagate to same-kind siblings in the workspace. */
+  linkId?: string;
+};
+
+export type Layer = TextLayer | ImageLayer | IconLayer;
 
 export type Orientation = 'portrait' | 'landscape';
 
@@ -175,6 +194,7 @@ type SessionState = {
   // Layer (inside active frame)
   addTextLayer: () => void;
   addImageLayer: (src: string, naturalW: number, naturalH: number) => void;
+  addIconLayer: (name: string) => void;
   removeLayer: (id: string) => void;
   duplicateLayer: (id: string) => void;
   updateLayer: (id: string, patch: Partial<Layer>) => void;
@@ -414,6 +434,17 @@ export const useSession = create<SessionState>()(
           const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
           if (!ws) return;
           const layer = createImageLayer(ws, src, naturalW, naturalH);
+          set((cur) => ({
+            workspaces: mapActiveFrame(cur, (f) => ({ ...f, layers: [...f.layers, layer] })),
+            selection: { kind: 'layer', id: layer.id },
+          }));
+        },
+
+        addIconLayer: (name) => {
+          const s = get();
+          const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+          if (!ws) return;
+          const layer = createIconLayer(ws, name);
           set((cur) => ({
             workspaces: mapActiveFrame(cur, (f) => ({ ...f, layers: [...f.layers, layer] })),
             selection: { kind: 'layer', id: layer.id },

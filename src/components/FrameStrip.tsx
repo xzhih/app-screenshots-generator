@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Plus, Copy, Trash2 } from 'lucide-react';
+import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import {
   useSession,
   getCanvasSize,
@@ -214,6 +215,32 @@ const Thumb = memo(function Thumb({
  * `ImageLayer.tsx` / `TextLayer.tsx` / `lib/export.ts` (see CLAUDE.md).
  */
 function ThumbLayer({ layer }: { layer: Layer }) {
+  if (layer.kind === 'icon') {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: layer.x,
+          top: layer.y,
+          width: layer.width,
+          height: layer.height,
+          transform: `rotate(${layer.rotation}deg)`,
+          transformOrigin: 'center',
+          color: layer.color,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      >
+        <DynamicIcon
+          name={layer.name as IconName}
+          size={Math.min(layer.width, layer.height)}
+          absoluteStrokeWidth
+          strokeWidth={layer.strokeWidth ?? 2}
+          style={{ width: layer.width, height: layer.height, display: 'block' }}
+        />
+      </div>
+    );
+  }
   if (layer.kind === 'image') {
     return (
       <img

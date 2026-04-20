@@ -2,6 +2,7 @@ import { useSession, findFrame } from '../store/session';
 import { LayerList } from './LayerList';
 import { TextProperties } from './TextProperties';
 import { ImageProperties } from './ImageProperties';
+import { IconProperties } from './IconProperties';
 import { BackgroundProperties } from './BackgroundProperties';
 import { CanvasProperties } from './CanvasProperties';
 
@@ -38,6 +39,8 @@ export function PropertiesPanel() {
           <TextProperties layer={selectedLayer} />
         ) : selectedLayer?.kind === 'image' ? (
           <ImageProperties layer={selectedLayer} />
+        ) : selectedLayer?.kind === 'icon' ? (
+          <IconProperties layer={selectedLayer} />
         ) : selection?.kind === 'background' ? (
           <BackgroundProperties />
         ) : (

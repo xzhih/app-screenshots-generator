@@ -3,6 +3,7 @@ import { Minus, Plus, Maximize2 } from 'lucide-react';
 import { useSession, findFrame, effectiveBackground, getCanvasSize } from '../store/session';
 import { TextLayer } from './TextLayer';
 import { ImageLayer } from './ImageLayer';
+import { IconLayer } from './IconLayer';
 import { SelectionFrame } from './SelectionFrame';
 import { fileToDataURL, loadImageDimensions } from '../lib/file';
 import { backgroundCSS } from '../lib/backgrounds';
@@ -237,8 +238,16 @@ export function Canvas() {
                 canvasHeight={size.height}
                 selected={selectedLayerId === layer.id}
               />
-            ) : (
+            ) : layer.kind === 'image' ? (
               <ImageLayer
+                key={layer.id}
+                layer={layer}
+                scale={scale}
+                canvasWidth={size.width}
+                canvasHeight={size.height}
+              />
+            ) : (
+              <IconLayer
                 key={layer.id}
                 layer={layer}
                 scale={scale}
@@ -259,6 +268,24 @@ export function Canvas() {
               allowRotation
               aspectLock={selectedLayer.aspectLocked ?? true}
               aspectRatio={selectedImageRatio}
+              canvasWidth={size.width}
+              canvasHeight={size.height}
+              onResize={(patch) => updateLayer(selectedLayer.id, patch)}
+              onRotate={(rotation) => updateLayer(selectedLayer.id, { rotation })}
+            />
+          )}
+
+          {selectedLayer?.kind === 'icon' && (
+            <SelectionFrame
+              x={selectedLayer.x}
+              y={selectedLayer.y}
+              width={selectedLayer.width}
+              height={selectedLayer.height}
+              rotation={selectedLayer.rotation}
+              scale={scale}
+              allowRotation
+              aspectLock={selectedLayer.aspectLocked ?? true}
+              aspectRatio={1}
               canvasWidth={size.width}
               canvasHeight={size.height}
               onResize={(patch) => updateLayer(selectedLayer.id, patch)}

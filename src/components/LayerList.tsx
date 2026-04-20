@@ -8,8 +8,11 @@ import {
   Upload,
   Link as LinkIcon,
   GripVertical,
+  Shapes,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
+import { useRef, useState } from 'react';
+import { IconPicker } from './IconPicker';
 import {
   useSession,
   effectiveBackground,
@@ -31,11 +34,13 @@ export function LayerList({
   const setSelection = useSession((s) => s.setSelection);
   const addTextLayer = useSession((s) => s.addTextLayer);
   const addImageLayer = useSession((s) => s.addImageLayer);
+  const addIconLayer = useSession((s) => s.addIconLayer);
   const removeLayer = useSession((s) => s.removeLayer);
   const duplicateLayer = useSession((s) => s.duplicateLayer);
   const reorderLayer = useSession((s) => s.reorderLayer);
   const moveLayer = useSession((s) => s.moveLayer);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -79,6 +84,14 @@ export function LayerList({
             <Upload size={11} />
             Image
           </button>
+          <button
+            onClick={() => setIconPickerOpen(true)}
+            title="Add icon"
+            className="flex items-center gap-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded px-1.5 py-1 text-[11px]"
+          >
+            <Shapes size={11} />
+            Icon
+          </button>
           <input
             ref={fileRef}
             type="file"
@@ -89,6 +102,16 @@ export function LayerList({
           />
         </div>
       </div>
+
+      {iconPickerOpen && (
+        <IconPicker
+          onSelect={(name) => {
+            addIconLayer(name);
+            setIconPickerOpen(false);
+          }}
+          onClose={() => setIconPickerOpen(false)}
+        />
+      )}
 
       <button
         onClick={() => setSelection({ kind: 'background' })}
@@ -153,9 +176,19 @@ export function LayerList({
                       aria-label={`Linked: ${l.linkId}`}
                     />
                   )}
-                  {l.kind === 'text' ? <Type size={11} /> : <ImageIcon size={11} />}
+                  {l.kind === 'text' ? (
+                    <Type size={11} />
+                  ) : l.kind === 'image' ? (
+                    <ImageIcon size={11} />
+                  ) : (
+                    <DynamicIcon name={l.name as IconName} size={11} />
+                  )}
                   <span className="flex-1 truncate">
-                    {l.kind === 'text' ? l.text || '(empty)' : 'Image'}
+                    {l.kind === 'text'
+                      ? l.text || '(empty)'
+                      : l.kind === 'image'
+                        ? 'Image'
+                        : l.name}
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button

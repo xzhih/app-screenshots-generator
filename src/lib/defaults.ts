@@ -1,6 +1,7 @@
 import { PLATFORMS, type FixedPlatform } from './platforms';
 import type {
   Frame,
+  IconLayer,
   ImageLayer,
   Orientation,
   TextLayer,
@@ -82,6 +83,27 @@ export function createTextLayer(
   layer.text = 'New text';
   layer.fontWeight = 500;
   return layer;
+}
+
+export function createIconLayer(
+  workspace: Pick<Workspace, 'platform' | 'orientation' | 'custom'>,
+  name: string,
+): IconLayer {
+  const { width, height } = getCanvasSize(workspace);
+  const size = Math.round(Math.min(width, height) * 0.2);
+  return {
+    id: uid(),
+    kind: 'icon',
+    name,
+    x: Math.round((width - size) / 2),
+    y: Math.round((height - size) / 2),
+    width: size,
+    height: size,
+    rotation: 0,
+    color: '#ffffff',
+    strokeWidth: 16,
+    aspectLocked: true,
+  };
 }
 
 export function createImageLayer(

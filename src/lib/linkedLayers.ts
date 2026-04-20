@@ -32,9 +32,21 @@ const IMAGE_STYLE_FIELDS: ReadonlySet<string> = new Set([
   'cornerRadius',
 ]);
 
+const ICON_STYLE_FIELDS: ReadonlySet<string> = new Set([
+  'x',
+  'y',
+  'width',
+  'height',
+  'rotation',
+  'aspectLocked',
+  'color',
+  'strokeWidth',
+]);
+
 export const STYLE_FIELDS_BY_KIND: Record<Layer['kind'], ReadonlySet<string>> = {
   text: TEXT_STYLE_FIELDS,
   image: IMAGE_STYLE_FIELDS,
+  icon: ICON_STYLE_FIELDS,
 };
 
 /**
