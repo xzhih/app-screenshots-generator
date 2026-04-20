@@ -1,8 +1,8 @@
 import { useRef } from 'react';
-import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import { useSession, type IconLayer as IconLayerT } from '../store/session';
 import { useDraggable } from '../hooks/useDraggable';
 import { applySnap } from '../lib/snap';
+import { IconGlyph } from './IconGlyph';
 
 type Props = {
   layer: IconLayerT;
@@ -59,20 +59,15 @@ export function IconLayer({ layer, scale, canvasWidth, canvasHeight }: Props) {
         cursor: 'move',
         touchAction: 'none',
         pointerEvents: 'auto',
-        color: layer.color,
       }}
     >
-      <DynamicIcon
-        name={layer.name as IconName}
-        size={Math.min(layer.width, layer.height)}
-        absoluteStrokeWidth
+      <IconGlyph
+        name={layer.name}
+        width={layer.width}
+        height={layer.height}
+        color={layer.color}
+        gradient={layer.gradient}
         strokeWidth={layer.strokeWidth ?? 2}
-        style={{
-          width: layer.width,
-          height: layer.height,
-          display: 'block',
-          pointerEvents: 'none',
-        }}
       />
     </div>
   );

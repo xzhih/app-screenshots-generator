@@ -41,6 +41,7 @@ const ICON_STYLE_FIELDS: ReadonlySet<string> = new Set([
   'rotation',
   'aspectLocked',
   'color',
+  'gradient',
   'strokeWidth',
 ]);
 

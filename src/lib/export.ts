@@ -1,6 +1,5 @@
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
-import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import {
   type Frame,
   type Layer,
@@ -11,23 +10,9 @@ import {
 } from '../store/session';
 import { backgroundCSS } from './backgrounds';
 import { applyTextFill } from './textFill';
+import { gradientEndpoints, loadIconNode } from './iconNodes';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-
-/** Cache resolved iconNode arrays so repeat exports don't re-import modules. */
-const iconNodeCache = new Map<string, Promise<IconNodeLike>>();
-
-type IconNodeLike = Array<[string, Record<string, string>]>;
-
-function loadIconNode(name: string): Promise<IconNodeLike> {
-  const cached = iconNodeCache.get(name);
-  if (cached) return cached;
-  const loader = (dynamicIconImports as Record<string, () => Promise<{ __iconNode: IconNodeLike }>>)[name];
-  if (!loader) return Promise.reject(new Error(`Unknown lucide icon: ${name}`));
-  const promise = loader().then((m) => m.__iconNode);
-  iconNodeCache.set(name, promise);
-  return promise;
-}
 
 /**
  * Render a single frame to a PNG data URL. Detaches a full-size DOM tree into
@@ -146,6 +131,8 @@ function buildImageLayer(layer: Extract<Layer, { kind: 'image' }>): HTMLImageEle
   return img;
 }
 
+let gradientSeq = 0;
+
 function buildIconLayer(layer: Extract<Layer, { kind: 'icon' }>): {
   element: HTMLDivElement;
   ready: Promise<void>;
@@ -158,7 +145,6 @@ function buildIconLayer(layer: Extract<Layer, { kind: 'icon' }>): {
   wrapper.style.height = `${layer.height}px`;
   wrapper.style.transform = `rotate(${layer.rotation}deg)`;
   wrapper.style.transformOrigin = 'center';
-  wrapper.style.color = layer.color;
 
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('xmlns', SVG_NS);
@@ -166,7 +152,6 @@ function buildIconLayer(layer: Extract<Layer, { kind: 'icon' }>): {
   svg.setAttribute('width', String(layer.width));
   svg.setAttribute('height', String(layer.height));
   svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', layer.color);
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   // Match DynamicIcon's `absoluteStrokeWidth`: stroke stays visually consistent
@@ -175,6 +160,33 @@ function buildIconLayer(layer: Extract<Layer, { kind: 'icon' }>): {
   const strokeWidth = ((layer.strokeWidth ?? 2) * 24) / Math.max(1, size);
   svg.setAttribute('stroke-width', String(strokeWidth));
   svg.style.display = 'block';
+
+  if (layer.gradient) {
+    const id = `export-icon-gradient-${gradientSeq++}`;
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    const linear = document.createElementNS(SVG_NS, 'linearGradient');
+    linear.setAttribute('id', id);
+    linear.setAttribute('gradientUnits', 'userSpaceOnUse');
+    const { x1, y1, x2, y2 } = gradientEndpoints(layer.gradient.angle);
+    linear.setAttribute('x1', String(x1));
+    linear.setAttribute('y1', String(y1));
+    linear.setAttribute('x2', String(x2));
+    linear.setAttribute('y2', String(y2));
+    const stop1 = document.createElementNS(SVG_NS, 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('stop-color', layer.gradient.from);
+    const stop2 = document.createElementNS(SVG_NS, 'stop');
+    stop2.setAttribute('offset', '100%');
+    stop2.setAttribute('stop-color', layer.gradient.to);
+    linear.appendChild(stop1);
+    linear.appendChild(stop2);
+    defs.appendChild(linear);
+    svg.appendChild(defs);
+    svg.setAttribute('stroke', `url(#${id})`);
+  } else {
+    svg.setAttribute('stroke', layer.color);
+  }
+
   wrapper.appendChild(svg);
 
   const ready = loadIconNode(layer.name)

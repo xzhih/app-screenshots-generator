@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Plus, Copy, Trash2 } from 'lucide-react';
-import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import {
   useSession,
   getCanvasSize,
@@ -12,6 +11,7 @@ import {
 import { backgroundCSS } from '../lib/backgrounds';
 import { useListReorder } from '../hooks/useListReorder';
 import { textFillStyle } from '../lib/textFill';
+import { IconGlyph } from './IconGlyph';
 
 const THUMB_HEIGHT = 96;
 
@@ -227,17 +227,17 @@ function ThumbLayer({ layer }: { layer: Layer }) {
           height: layer.height,
           transform: `rotate(${layer.rotation}deg)`,
           transformOrigin: 'center',
-          color: layer.color,
           pointerEvents: 'none',
           userSelect: 'none',
         }}
       >
-        <DynamicIcon
-          name={layer.name as IconName}
-          size={Math.min(layer.width, layer.height)}
-          absoluteStrokeWidth
+        <IconGlyph
+          name={layer.name}
+          width={layer.width}
+          height={layer.height}
+          color={layer.color}
+          gradient={layer.gradient}
           strokeWidth={layer.strokeWidth ?? 2}
-          style={{ width: layer.width, height: layer.height, display: 'block' }}
         />
       </div>
     );

@@ -65,6 +65,13 @@ export type ImageLayer = {
   linkId?: string;
 };
 
+export type IconGradient = {
+  kind: 'linear';
+  from: string;
+  to: string;
+  angle: number;
+};
+
 export type IconLayer = {
   id: string;
   kind: 'icon';
@@ -76,6 +83,8 @@ export type IconLayer = {
   /** Lucide icon name (kebab-case, e.g. 'star', 'heart', 'arrow-right'). */
   name: string;
   color: string;
+  /** When present, stroke is painted with a gradient and overrides `color`. */
+  gradient?: IconGradient;
   /** SVG stroke-width in lucide's 24px viewBox units. Defaults to 2. */
   strokeWidth?: number;
   aspectLocked?: boolean;
