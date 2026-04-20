@@ -21,6 +21,13 @@ export type { Background } from '../lib/backgrounds';
 
 export type FontWeight = 400 | 500 | 600 | 700 | 800 | 900;
 
+export type TextGradient = {
+  kind: 'linear';
+  from: string;
+  to: string;
+  angle: number;
+};
+
 export type TextLayer = {
   id: string;
   kind: 'text';
@@ -31,7 +38,10 @@ export type TextLayer = {
   text: string;
   fontSize: number;
   fontWeight: FontWeight;
+  /** Base color. Used when `gradient` is not set (backward-compatible fallback). */
   color: string;
+  /** When present, rendered via background-clip: text and overrides `color`. */
+  gradient?: TextGradient;
   align: 'left' | 'center' | 'right';
   /** Optional link group: style fields propagate to same-kind siblings in the workspace. */
   linkId?: string;

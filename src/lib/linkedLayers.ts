@@ -19,6 +19,7 @@ const TEXT_STYLE_FIELDS: ReadonlySet<string> = new Set([
   'fontSize',
   'fontWeight',
   'color',
+  'gradient',
   'align',
 ]);
 

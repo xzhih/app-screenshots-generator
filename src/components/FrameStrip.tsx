@@ -11,6 +11,7 @@ import {
 } from '../store/session';
 import { backgroundCSS } from '../lib/backgrounds';
 import { useListReorder } from '../hooks/useListReorder';
+import { textFillStyle } from '../lib/textFill';
 
 const THUMB_HEIGHT = 96;
 
@@ -277,7 +278,7 @@ function ThumbLayer({ layer }: { layer: Layer }) {
           '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize: layer.fontSize,
         fontWeight: layer.fontWeight,
-        color: layer.color,
+        ...textFillStyle(layer),
         lineHeight: 1.05,
         letterSpacing: '-0.02em',
         textAlign: layer.align,

@@ -10,6 +10,7 @@ import {
   legacyScreenshotsToWorkspaces,
 } from '../store/session';
 import { backgroundCSS } from './backgrounds';
+import { applyTextFill } from './textFill';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -203,7 +204,7 @@ function buildTextLayer(layer: Extract<Layer, { kind: 'text' }>): HTMLDivElement
   el.style.fontFamily = `"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif`;
   el.style.fontSize = `${layer.fontSize}px`;
   el.style.fontWeight = String(layer.fontWeight);
-  el.style.color = layer.color;
+  applyTextFill(el, layer);
   el.style.lineHeight = '1.05';
   el.style.letterSpacing = '-0.02em';
   el.style.textAlign = layer.align;

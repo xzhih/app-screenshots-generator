@@ -3,6 +3,7 @@ import { useSession, type TextLayer as TextLayerT } from '../store/session';
 import { useDraggable } from '../hooks/useDraggable';
 import { SelectionFrame } from './SelectionFrame';
 import { applySnap } from '../lib/snap';
+import { textFillStyle } from '../lib/textFill';
 
 type Props = {
   layer: TextLayerT;
@@ -132,7 +133,7 @@ export function TextLayer({ layer, scale, canvasWidth, canvasHeight, selected }:
           width: layer.width,
           fontSize: layer.fontSize,
           fontWeight: layer.fontWeight,
-          color: layer.color,
+          ...textFillStyle(layer),
           lineHeight: 1.05,
           letterSpacing: '-0.02em',
           textAlign: layer.align,
